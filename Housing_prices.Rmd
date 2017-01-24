@@ -1,0 +1,111 @@
+---
+title: "Housing Prices - Ames Iowa"
+author: "Vy Nguyen"
+date: "January 23, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Libraries
+
+```{r}
+rm(list=ls())
+library(dplyr)
+library(tidyr)
+library(glmnet)
+library(caret)
+library(mice) # Impute missing values
+library(VIM) # Visualizing missing data
+
+```
+
+Overview understanding of the data
+
+```{r }
+train <- read.csv("train.csv")
+test <- read.csv("test.csv")
+names(train)
+head(train)
+summary(train)
+str(train)
+```
+
+## Visualizations
+
+### Visualization for missing data
+
+```{r}
+pMiss <- function(x){sum(is.na(x))/length(x)*100} # Calculate the percentage of missing values
+missVar <- apply(train,2,pMiss)
+missVar
+aggr_plot <- aggr(train, col=c('navyblue','red'), numbers=TRUE, sortVars=TRUE, labels=names(train), cex.axis=.7, gap=3, ylab=c("Histogram of missing data","Pattern"))
+
+```
+
+The data contains few missing values as we note some variables as follows:
+* `BsmtQual`,`BsmtCond`, `BsmtExposure`, `BsmtFinType1`, `BsmtFinType2`
+* `GarageType`, `GarageYrBlt`, `GarageFinish`, `GarageQual`, `GarageCond`
+* `Alley`, `FireplaceQu`, `PoolQC`, `Fence`,`MiscFeature`
+
+whose `NA` values simply mean the house does not have that feature/facility.
+
+Variables with true missing values are below.
+* `LotFrontage`: Linear feet of street connected to property (18% missing values)
+* `MasVnrType`, `MasVnrArea`: Masonry Veneer type houses (0.5% missing values) - consider removing obs
+* `Electrical`: Electrical system (0.07% missing values) - consider removing obs
+
+`LotFrontage` has the most missing values. The other two variables have very few missing values. We could consider using imputation methods to impute the missing values.
+
+### Visualizations for numeric variables
+
+```{r}
+
+
+```
+
+
+### Visualizations for categorical variables
+
+```{r}
+
+
+```
+
+### Building the models
+
+#### The Lasso
+
+```{r}
+## Removing and/or Imputing missing values
+train <- subset(train,!(is.na(MasVnrType)|is.na(Electrical))) # Removing observations with NAs values
+noneCol <- c(7, 31:34, 36,58:59,61,64:65,73:75) # Categorical variables with NA for 'None' value
+zeroCol <- c(60) # Continuous variables with NA to be replaced with 'Zero' value
+
+length(noneCol) + length(zeroCol)
+sum(apply(train[,noneCol],2,is.factor)) == 0 # Check if they are factor variables
+
+for (i in noneCol){
+  train[,i] <- addNA(train[,i]) #Add NA as a factor variable
+}
+
+# train[,noneCol] <- apply(train[,noneCol],2,addNA) 
+train[,noneCol] <- factor(train[,noneCol])
+#x <- train[,zeroCol]
+#x[is.na(x)] <- 0
+#train[,zeroCol] <- x
+train[is.na(train[,zeroCol]),zeroCol] <- 0 #Assigning zero values to zeroCol
+
+tmp <- mice(train,method="cart")
+
+for (i in (1:5)){
+  completed.i <- complete(tmp,i)
+  write.table(completed.i, "impute.txt",
+            sep="\t", row.names=FALSE)
+  imp.i = read.table("impute.txt",sep="\t",header = TRUE)
+}
+
+```
+
